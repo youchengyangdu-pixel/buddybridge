@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "defaultMode": "auto",
+    "allow": [
+      "WebSearch",
+      "WebFetch",
+      "Read",
+      "Edit",
+      "Bash(git:*)",
+      "Bash(npm:*)",
+      "Bash(node:*)",
+      "Bash(python:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(sudo:*)",
+      "Bash(eval:*)",
+      "Bash(curl:*)",
+      "Bash(wget:*)",
+      "Bash(git push:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git clean:*)",
+      "Edit(.git/**)",
+      "Edit(.codebuddy/**)",
+      "Edit(.mcp.json)",
+      "Edit(.env*)",
+      "Read(.env*)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)"
+    ]
+  }
+}

@@ -1,0 +1,24 @@
+# 运行产物（根锚定：只忽略仓库根的实例化文件，不影响 templates/ 与 examples/）
+# 实际使用时这些文件出现在你的工作目录（仓库外），此处仅为防止误提交
+/run.log
+/research.log
+/review.log
+/ultra.log
+/PROGRESS.md
+/REPORT.md
+/REVIEW-REPORT.md
+/REVIEW-A.md
+/REVIEW-B.md
+/REVIEW-C.md
+/STAGE-*.md
+/APPROVED.md
+/done.txt
+/task*.txt
+/files.txt
+
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/

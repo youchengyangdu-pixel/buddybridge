@@ -1,5 +1,7 @@
 # BuddyBridge
 
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
+
 **Turn your desktop AI assistant into mission control. Let CodeBuddy CLI do the grinding.**
 
 BuddyBridge is a discipline, not a daemon: a set of file conventions plus one headless command pattern that lets a desktop AI assistant (WorkBuddy) **plan, review, and approve** — while CodeBuddy CLI agents **research, cross-review, and execute unattended**. The assistant writes the exact command; you paste it into a terminal and walk away; the assistant watches the files and verifies the results. No memory loss between runs, no babysitting terminals.

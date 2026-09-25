@@ -1,5 +1,7 @@
 # BuddyBridge
 
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
+
 **把桌面端 AI 助手变成任务控制中心，让 CodeBuddy CLI 干重活。**
 
 BuddyBridge 不是常驻服务，是一套纪律：一组文件契约 + 一条 headless 命令模板，让桌面端 AI 助手（WorkBuddy）负责**计划、审查、终裁**，CodeBuddy CLI 负责**调研、交叉审查、无人值守执行**。助手生成完整命令、你贴进终端就可以走人、助手盯文件播进度并验收。运行之间不丢上下文，不用盯终端。

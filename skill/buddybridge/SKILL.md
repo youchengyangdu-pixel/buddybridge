@@ -47,6 +47,16 @@ CodeBuddy CLI 是**两个外派引擎**：
 3. 用户自己开的终端（独立 PowerShell）天然无这些变量，一切正常 —— v1 就建立在这条已验证的路上
 - launcher 脚本保留为 v1.1 攻坚基础（env 半边已解，插件初始化半边待解）
 
+**macOS v1.1 已打通（2026-09-26 实测，CLI v2.156.0 + WorkBuddy 桌面端）**：墙 2 在 macOS 不存在（SAFE_DELETE_BULK_GUARD helper 真实存在于 WorkBuddy.app 内，launch.sh 保留它即可）。用 `env -i` 白名单环境法（比 launch.sh 逐个 unset 更彻底）即可在会话内直拉：
+
+```bash
+env -i HOME="$HOME" USER="$USER" TMPDIR="$TMPDIR" LANG=en_US.UTF-8 \
+  PATH="/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+  /bin/zsh -f -c 'cd <项目绝对路径> && codebuddy -p -y --max-turns <N> "<自包含指令>"'
+```
+
+实测通过：模型调用 ✅ / 文件写入 ✅ / 正常退出 ✅。要点：PATH 必须含 /opt/homebrew/bin（codebuddy 所在）；zsh -f 不加载 rc 防变量再污染；代理默认不带（国内直连可通，失败再补 HTTPS_PROXY=http://127.0.0.1:7897）。**分工**：中短任务（分钟级）走会话内直拉（stdout 直接回收，桌面端同步监控）；长挂机任务（小时级）仍走 v1 贴命令形态（不占会话、断网不丢）。APPROVED 人工门控不变。Windows 维持 v1 贴命令形态。
+
 ## 流程零：前置自检（每次派发前，30 秒）
 
 1. `codebuddy --version` ≥ **2.105.0**（引擎B 最低 2.99.0；引擎A 的 Dynamic Workflows 最低 2.105.0）

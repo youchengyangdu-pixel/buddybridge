@@ -36,7 +36,7 @@ Design plans to avoid high-risk commands (BuddyBridge templates forbid them), ke
 
 **Why not spawn the CLI from inside the desktop session (v1.1, blocked)?** We tested this exhaustively on Windows (2026-09-25, CLI v2.158.0) and hit a layered wall — recording it here because nobody else has documented it:
 
-1. The desktop host injects `CODEBUDDY_CONFIG_DIR`, `CODEBUDDY_MCP_CONFIG` (the host's entire MCP cluster, including heavyweight servers) and friends into child shells. A CLI spawned from inside the session boots in "host-child mode": it reads the host's config dir and connects the host's MCP fleet — one test run ballooned to a **138k-token prompt** and produced zero artifacts in 11 minutes.
+1. The desktop host injects `CODEBUDDY_CONFIG_DIR`, `CODEBUDDY_MCP_CONFIG` (the host's entire MCP cluster, including heavyweight servers) and friends into child shells. A CLI spawned from inside the session boots in "host-child mode": it reads the host's config dir and connects the host's MCP fleet — one test run ballooned to a **138,075-token prompt** (exact figure from the v2.158.0 model-request log, `prompt_tokens=138075`) and produced zero artifacts in 11 minutes.
 2. Clearing the variables (via the `scripts/launch.*` launcher in this repo) re-boots the CLI in standalone mode, but plugin/marketplace initialization then fails (`SAFE_DELETE_BULK_GUARD` helper path unavailable → plugin pass incomplete → exit 1 with no output on some shells, or a hang on others).
 3. A human-launched terminal (your own PowerShell window) has none of these variables and works perfectly — which is exactly why v1 rides on it.
 

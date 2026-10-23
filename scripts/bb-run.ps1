@@ -44,13 +44,18 @@ if (-not (Test-Path -LiteralPath $PromptPath)) { Fail 'PROMPT.md missing - write
 
 # ---------- gate: APPROVED.md (single carrier, human-readable) ----------
 # Fingerprint covers BOTH files: approving PLAN.md but swapping PROMPT.md must fail.
-function Get-DispatchSha12($planFile, $promptFile) {
+# PROMPT is read ONCE here and that exact byte array is fed to the CLI later,
+# so "verify A, execute B" is impossible.
+function Get-DispatchSha12($planFile, [byte[]]$promptBytes) {
   $p = (Get-FileHash -LiteralPath $planFile -Algorithm SHA256).Hash.ToLower()
-  $q = (Get-FileHash -LiteralPath $promptFile -Algorithm SHA256).Hash.ToLower()
+  $sha = [System.Security.Cryptography.SHA256]::Create()
+  $q = -join ($sha.ComputeHash($promptBytes) | ForEach-Object { $_.ToString('x2') })
   $seed = [System.Text.Encoding]::ASCII.GetBytes($p + ':' + $q)
   $h = [System.Security.Cryptography.SHA256]::Create().ComputeHash($seed)
   return (-join ($h | ForEach-Object { $_.ToString('x2') })).Substring(0, 12)
 }
+
+$PromptBytes = [System.IO.File]::ReadAllBytes($PromptPath)
 
 $gateInfo = [ordered]@{ checked = $false; status = 'skipped'; claimed = $false }
 # availability must be verified BEFORE claiming an approval, otherwise a missing CLI burns it
@@ -86,13 +91,16 @@ if (-not $SkipGate) {
   # optional binding to this directory: a copied bundle must not approve a different folder
   if ($wm.Success) {
     $declaredDir = $wm.Groups[1].Value.Trim().Trim('"')
-    $normDeclared = $declaredDir.Replace('\','/').TrimEnd('/').ToLower()
-    $normActual = $WorkDir.Replace('\','/').TrimEnd('/').ToLower()
-    if ($normDeclared -ne $normActual) {
-      Fail ('work_dir mismatch: approved for "' + $declaredDir + '" but dispatching "' + $WorkDir + '"') 18
+    # an unfilled placeholder ("<项目绝对路径>") means "not bound", not a mismatch
+    if ($declaredDir -and $declaredDir -notmatch '^[<（(]') {
+      $normDeclared = $declaredDir.Replace('\','/').TrimEnd('/').ToLower()
+      $normActual = $WorkDir.Replace('\','/').TrimEnd('/').ToLower()
+      if ($normDeclared -ne $normActual) {
+        Fail ('work_dir mismatch: approved for "' + $declaredDir + '" but dispatching "' + $WorkDir + '"') 18
+      }
     }
   }
-  $actual = Get-DispatchSha12 $PlanPath $PromptPath
+  $actual = Get-DispatchSha12 $PlanPath $PromptBytes
   if ($hm.Groups[1].Value.ToLower() -ne $actual) {
     Fail ('dispatch hash mismatch: approved=' + $hm.Groups[1].Value.ToLower() + ' actual=' + $actual + ' (covers PLAN.md + PROMPT.md)') 17
   }
@@ -180,9 +188,9 @@ $status = 'ERROR'; $exitCode = 1; $stdout = ''; $stderr = ''
 
 try {
   $proc.Start() | Out-Null
-  $promptText = Get-Content -LiteralPath $PromptPath -Raw -Encoding UTF8
+  # use the exact bytes that were fingerprinted during the gate (no second read)
   $u8 = New-Object System.Text.UTF8Encoding($false)
-  $bytes = $u8.GetBytes($promptText)
+  $bytes = $PromptBytes
   # Async write: a large prompt into a process that does not read stdin would block
   # forever, and WaitForExit would never be reached (TimeoutSec would be useless).
   try {
@@ -253,19 +261,19 @@ if (Test-Path -LiteralPath $ProgressPath) {
   }
 }
 
-# numbering continuity: 1..max(id) must all be present.
-# Guard against date-like ids (e.g. 20260101): enumerate only when max is small.
+# numbering continuity: 1..max(id), guarded against date-like ids.
+# NOTE: max must be taken from ALL ids first - filtering before the max made the
+# guard unreachable (gaps_skipped was permanently false).
 $gaps = 0
 $gapsSkipped = $false
-$numericIds = @($ids | Where-Object { $_ -le 100000 })
 $maxId = 0
-if ($numericIds.Count -gt 0) { $maxId = ($numericIds | Measure-Object -Maximum).Maximum }
-if ($maxId -gt 0 -and $maxId -le 100000) {
-  $seen = New-Object 'System.Collections.Generic.HashSet[int]'
-  foreach ($i in $ids) { [void]$seen.Add($i) }
-  for ($k = 1; $k -le $maxId; $k++) { if (-not $seen.Contains($k)) { $gaps++ } }
-} elseif ($maxId -gt 100000) {
+if ($ids.Count -gt 0) { $maxId = ($ids | Measure-Object -Maximum).Maximum }
+if ($maxId -gt 100000) {
   $gapsSkipped = $true
+} elseif ($maxId -ge 1) {
+  $seen = New-Object 'System.Collections.Generic.HashSet[int]'
+  foreach ($i in $ids) { if ($i -ge 1 -and $i -le $maxId) { [void]$seen.Add($i) } }
+  for ($k = 1; $k -le $maxId; $k++) { if (-not $seen.Contains($k)) { $gaps++ } }
 }
 
 $tail = @()

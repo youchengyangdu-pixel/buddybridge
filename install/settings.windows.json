@@ -78,6 +78,7 @@
       "Edit(**/.git/**)",
       "Edit(**/.codebuddy/**)",
       "Edit(**/.workbuddy/**)",
+      "Edit(**/.buddybridge/**)",
       "Edit(**/.mcp.json)",
       "Edit(**/.env*)",
       "Edit(**/APPROVED.json)",
@@ -86,7 +87,8 @@
       "Read(**/.ssh/**)",
       "Read(**/.aws/**)",
       "Read(**/.codebuddy/**)",
-      "Read(**/.workbuddy/**)"
+      "Read(**/.workbuddy/**)",
+      "Read(**/.buddybridge/**)"
     ]
   }
 }

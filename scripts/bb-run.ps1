@@ -53,14 +53,25 @@ function Get-DispatchSha12($planFile, $promptFile) {
 }
 
 $gateInfo = [ordered]@{ checked = $false; status = 'skipped'; claimed = $false }
+# availability must be verified BEFORE claiming an approval, otherwise a missing CLI burns it
+$cb = Get-Command codebuddy -ErrorAction SilentlyContinue
+if (-not $cb) { Fail 'codebuddy not in PATH' 19 }
+$nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+$pkgBin = Join-Path (Split-Path -Parent $cb.Source) 'node_modules\@tencent-ai\codebuddy-code\bin\codebuddy'
+$useNode = ($nodeCmd -and (Test-Path -LiteralPath $pkgBin))
+if (-not $useNode) { Fail 'node or package entry not found - reinstall @tencent-ai/codebuddy-code' 20 }
+
 if (-not $SkipGate) {
   if (-not (Test-Path -LiteralPath $ApprovePath)) { Fail 'APPROVED.md missing' 10 }
   if (-not (Test-Path -LiteralPath $PlanPath)) { Fail 'PLAN.md missing' 11 }
   $md = Get-Content -LiteralPath $ApprovePath -Raw -Encoding UTF8
-  $hm = [regex]::Match($md, 'dispatch_sha256\s*:\s*([0-9a-fA-F]{12})')
-  $tm = [regex]::Match($md, 'token\s*:\s*([0-9a-fA-F]{8,32})')
-  $sm = [regex]::Match($md, 'status\s*:\s*([A-Za-z]+)')
-  $em = [regex]::Match($md, 'expires\s*:\s*([0-9T:+\-\.]{10,40})')
+  # case-insensitive + anchored at line start (a stray mention in the prose must never match)
+  $opt = [System.Text.RegularExpressions.RegexOptions]::IgnoreCase -bor [System.Text.RegularExpressions.RegexOptions]::Multiline
+  $hm = [regex]::Match($md, '(?m)^\s*[-*]?\s*dispatch_sha256\s*:\s*([0-9a-f]{12})', $opt)
+  $tm = [regex]::Match($md, '(?m)^\s*[-*]?\s*token\s*:\s*([0-9a-f]{8,32})', $opt)
+  $sm = [regex]::Match($md, '(?m)^\s*[-*]?\s*status\s*:\s*([A-Za-z]+)', $opt)
+  $em = [regex]::Match($md, '(?m)^\s*[-*]?\s*expires\s*:\s*([0-9T:+\-\.]{10,40})', $opt)
+  $wm = [regex]::Match($md, '(?m)^\s*[-*]?\s*work_dir\s*:\s*(.+)$', $opt)
   if (-not $hm.Success) { Fail 'APPROVED.md has no dispatch_sha256 (it must cover PLAN.md + PROMPT.md)' 12 }
   if (-not $tm.Success) { Fail 'APPROVED.md has no token' 13 }
   if (-not $sm.Success) { Fail 'APPROVED.md has no status' 14 }
@@ -72,6 +83,15 @@ if (-not $SkipGate) {
       if ([DateTimeOffset]::Now -gt $exp) { Fail 'APPROVED.md expired' 16 }
     } catch { }
   }
+  # optional binding to this directory: a copied bundle must not approve a different folder
+  if ($wm.Success) {
+    $declaredDir = $wm.Groups[1].Value.Trim().Trim('"')
+    $normDeclared = $declaredDir.Replace('\','/').TrimEnd('/').ToLower()
+    $normActual = $WorkDir.Replace('\','/').TrimEnd('/').ToLower()
+    if ($normDeclared -ne $normActual) {
+      Fail ('work_dir mismatch: approved for "' + $declaredDir + '" but dispatching "' + $WorkDir + '"') 18
+    }
+  }
   $actual = Get-DispatchSha12 $PlanPath $PromptPath
   if ($hm.Groups[1].Value.ToLower() -ne $actual) {
     Fail ('dispatch hash mismatch: approved=' + $hm.Groups[1].Value.ToLower() + ' actual=' + $actual + ' (covers PLAN.md + PROMPT.md)') 17
@@ -79,7 +99,7 @@ if (-not $SkipGate) {
   # claim-at-gate: flip to used NOW, so two concurrent runs cannot both pass.
   # A dry run must NOT consume the approval.
   if (-not $DryRun) {
-    $mdUsed = [regex]::Replace($md, 'status\s*:\s*approved', 'status: used')
+    $mdUsed = [regex]::Replace($md, '(?m)^(\s*[-*]?\s*status\s*:\s*)approved', '${1}used', $opt)
     [System.IO.File]::WriteAllText($ApprovePath, $mdUsed, (New-Object System.Text.UTF8Encoding($false)))
     $gateInfo.status = 'used'
     $gateInfo.claimed = $true
@@ -115,11 +135,7 @@ foreach ($k in @(
 [System.Environment]::SetEnvironmentVariable('CODEBUDDY_CONFIG_DIR', $homeCfg)
 
 # ---------- build command ----------
-$cb = Get-Command codebuddy -ErrorAction SilentlyContinue
-if (-not $cb) { Fail 'codebuddy not in PATH' 19 }
-$nodeCmd = Get-Command node -ErrorAction SilentlyContinue
-$pkgBin = Join-Path (Split-Path -Parent $cb.Source) 'node_modules\@tencent-ai\codebuddy-code\bin\codebuddy'
-$useNode = ($nodeCmd -and (Test-Path -LiteralPath $pkgBin))
+# ($cb / $nodeCmd / $pkgBin / $useNode were resolved before the gate, so a missing CLI never burns an approval)
 
 $mcpFile = Join-Path $runDir 'empty-mcp.json'
 [System.IO.File]::WriteAllText($mcpFile, '{"mcpServers":{}}', (New-Object System.Text.UTF8Encoding($false)))

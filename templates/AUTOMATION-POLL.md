@@ -32,6 +32,11 @@
 | TIMEOUT | 124 | 被硬超时杀掉，任务太长或卡死 |
 | ERROR | 1 | 包装器自身异常（看 log_tail 的 stderr 段） |
 
+**另外三个字段要一起看**：
+- `claim_rolled_back=true` → 这次派发没真正干活，批准已退回 `approved`，可以直接重派
+- `ledger.hash_mismatch>0` → 账本里声明的 hash 与实际不符（要么产物被改，要么 agent 编了值）
+- `ledger.gaps>0` → 编号有空号（有验收项根本没跑）；`gaps_skipped=true` 表示编号是日期式，需人工确认
+
 ## 为什么不用 hooks
 
 实测（2026-10-23）：`-p` 模式下 Stop / PostToolUse hook 均不触发，且 Git Bash 不在 PATH。所以回传只依赖文件轮询，不依赖任何 hook。

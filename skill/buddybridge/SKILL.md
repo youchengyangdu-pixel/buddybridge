@@ -127,6 +127,8 @@ powershell -ExecutionPolicy Bypass -File <仓库>\scripts\bb-run.ps1 -WorkDir "<
 
 **账本纪律**：agent 只写 `<编号>|done|<产物绝对路径>||||`（后三列留空）。**不要要求 agent 自己算 sha256** —— 默认档不授予 shell，它算不出来只会编；校验值由 `bb-run` 收尾时统一计算并写进 `COMPLETION.json.verified`。
 
+**并发约束（明确边界）**：`claim-at-gate` 会在派发瞬间消费凭证，但**同一 WorkDir 仍不要同时启动两个 `bb-run`** —— 凭证的读-验-写没有文件锁，理论上两个同时启动的进程都可能过门。要并行请用不同 WorkDir。
+
 **阶段收口的作用**：完整版永远在磁盘（STAGE-*.md），最新版永远在 transcript 尾部（状态自述）—— 官方 auto-compact 压缩旧轮次时**吃不掉证据**，goal 评估器始终能看到最近的自述。重载克制：旧细节从 STAGE 文件按需读回，**只回注索引/摘要，禁止整段塞回**（保前缀缓存命中）。
 
 ## 流程四：MONITOR（监控）

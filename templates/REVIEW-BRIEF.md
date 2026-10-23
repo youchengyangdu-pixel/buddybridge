@@ -61,5 +61,5 @@
 
 ## 门控约定
 
-- 本报告落盘后由**人工**阅读并拍板 → 拍板凭证 = 人工填写 templates/APPROVED.md（含 PLAN sha256 前 12 位 + 随机 token）
-- 派发引擎B 前桌面端 AI 机械校验 APPROVED.md（存在 + hash 一致 + token 一致），AI 不得代写
+- 本报告落盘后由**人工**阅读并拍板 → 拍板凭证 = 人工填写 templates/APPROVED.md（`dispatch_sha256` = `sha256(PLAN 的 sha256 + ":" + PROMPT 的 sha256)` 前 12 位 + 随机 token）
+- 派发引擎B 前由 `bb-run.ps1` 机械校验（存在 + 指纹一致 + status=approved + 未过期），AI 不得代写

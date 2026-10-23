@@ -135,7 +135,7 @@ powershell -ExecutionPolicy Bypass -File <仓库>\scripts\bb-run.ps1 -WorkDir "<
 
 ## 流程五：VERIFY（验收）
 
-1. **账本核对**：读 `COMPLETION.json` 的 `verified` 数组（wrapper 已对每个产物算过真实 sha256）→ 核对 `ledger.missing_files` 与 `failed` 是否为 0；**随机抽 1 项由桌面端亲自打开产物核对内容是否符合 PLAN 该项验收标准**（不只看文件存在）
+1. **账本核对**：读 `COMPLETION.json` 的 `ledger` 与 `verified` —— 要求 `missing_files=0`、`failed=0`、`hash_mismatch=0`、`gaps=0`（`gaps_skipped=true` 表示编号是日期式，人工确认连续性）；**随机抽 1 项由桌面端亲自打开产物核对内容是否符合 PLAN 该项验收标准**（不只看文件存在）
 2. **进程清查**：`Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Where-Object {$_.CommandLine -like '*buddybridge*'}` 仅作异常发现；清理由 `bb-run` 的硬超时自动完成（`taskkill /T /F`），不手工杀
 3. **异常处置**：`COMPLETION.status=TIMEOUT` → 任务太长或条件不可达，缩短范围重派；`exit_code≠0` → 读 `log_tail` 判断是护栏拦截（改 PLAN 绕开）还是认证/网络问题
 

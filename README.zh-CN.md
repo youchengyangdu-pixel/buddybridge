@@ -24,13 +24,13 @@ WorkBuddy（任务控制中心）
   │    （路由必须自曝，退化必须标红）→ REVIEW-REPORT.md 落盘
   ├─→ 【A2 计划终审】  默认单轮普通审查；大项目才开 ultracode 档
   │
-  ├── 人工门控（机器校验）── 你亲手填 APPROVED.md（计划 checksum + 手打
-  │   随机 token）；派发方机械校验。没有 APPROVED.md → 不执行。
-  │   AI 不能替你写。
+  ├── 人工门控（机器校验）── 你亲手填 APPROVED.md（PLAN+PROMPT 联合指纹 + 手打
+  │   随机 token）；bb-run 机械校验并在派发瞬间消费。
+  │   没有 APPROVED.md → 不执行。AI 不能替你写。
   │
   ├─→ 【B 引擎：goal 循环 + --effort max】无人值守执行 → PROGRESS.md
-  │    账本：编号|done|产物|字节数|sha256前8位 → STAGE-{N}.md 阶段归档
-  │    → 末轮自证命令输出贴进对话
+  │    账本：编号|done|产物路径（校验值由包装器统一计算，不要求 agent 填）
+  │    → COMPLETION.json（verified[] + 账本统计）
   │
   └─ 验收：校验值重算 + 账本零空号 + 内容抽样复验 + 无孤儿进程
 ```

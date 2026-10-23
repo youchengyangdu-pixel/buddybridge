@@ -1,6 +1,6 @@
 # 批准凭证（APPROVED）
 
-> 这是**唯一**的放行凭证。`bb-run.ps1` 只读三项：`dispatch_sha256` / `status` / `expires`。
+> 这是**唯一**的放行凭证。`bb-run.ps1` 只读四项：`dispatch_sha256` / `token` / `status` / `expires`（另有可选 `work_dir`）。
 > 指纹同时覆盖 `PLAN.md` **和** `PROMPT.md` —— 换了任务书也必须重新批准。
 > 派发时脚本会立刻把 `status: approved` 改写为 `status: used`（claim-at-gate），同一份凭证不能再用第二次。
 

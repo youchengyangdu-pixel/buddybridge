@@ -26,6 +26,6 @@
 
 ## 为什么 hash 交给包装器
 
-引擎B 默认档（`-ToolProfile file`）**不授予 shell**，agent 无法运行 `sha256sum`/`Get-FileHash`。
+引擎B 默认档（`--disallowedTools Bash PowerShell`）**不授予 shell**，agent 无法运行 `sha256sum`/`Get-FileHash`。
 如果要求它算 hash，它只能编一个数字 —— 那正好摧毁账本的可信度。
 包装器在执行结束后遍历账本、对每个产物算真实 sha256，写入 `COMPLETION.json` 的 `verified` 数组。

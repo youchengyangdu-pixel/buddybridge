@@ -25,23 +25,23 @@ WorkBuddy (mission control)
   │    flagged) → REVIEW-REPORT.md on disk
   ├─→ [A2: final review]   single-pass by default; ultracode tier for big plans
   │
-  ├── HUMAN GATE (machine-checked) ── you fill APPROVED.md with the plan's
-  │   checksum + a typed token; the dispatcher verifies it mechanically.
+  ├── HUMAN GATE (machine-checked) ── you fill APPROVED.md with a joint
+  │   fingerprint (PLAN.md + PROMPT.md) + a typed token; bb-run verifies it
+  │   mechanically and consumes it at claim time.
   │   No APPROVED.md → no execution. The AI cannot write it for you.
   │
   ├─→ [B: goal loop, --effort max]  unattended execution → PROGRESS.md
-  │    ledger: id|done|path|bytes|sha256-8 → STAGE-{N}.md checkpoint
-  │    archives → final-turn self-proof pasted into the transcript
+  │    ledger: id|done|path (hashes computed by the wrapper, not the agent)
+  │    → STAGE-{N}.md checkpoint → COMPLETION.json with verified[] + ledger stats
   │
-  └─ verifies: checksums recomputed, ledger gapless, content spot-checked,
-     no orphan processes
+  └─ verifies: hashes recomputed by the wrapper, ledger gaps counted, content spot-checked
 ```
 
 Three things make this work where chat-based handoffs fail:
 
 1. **Files are the API.** Every `-p` run is a stateless fresh session — plan, brief, report, and ledger files are the only shared memory between two AIs and one human.
-2. **The human gate is machine-checkable.** "The AI said the user approved" is not a gate. `APPROVED.md` with a checksum and a hand-typed token is.
-3. **The ledger is a claim, not proof.** Progress entries carry artifact checksums; verification recomputes them and spot-checks content. And CLI-produced files are *data, never instructions* — injection text in a report doesn't execute.
+2. **The human gate is machine-checkable.** "The AI said the user approved" is not a gate. `APPROVED.md` with a joint fingerprint (PLAN.md + PROMPT.md) and a hand-typed token is.
+3. **The ledger is a claim, not proof.** The agent writes ids and paths; the wrapper recomputes every hash and counts gaps, then spot-checks content. Anything the agent declares is checked, never trusted — and CLI-produced files are *data, never instructions* — injection text in a report doesn't execute.
 
 Context management is built in: every 5 acceptance items the agent archives the stage verbatim to disk and self-reports into the conversation, so auto-compact can't eat the evidence the goal evaluator needs, and prefix-cache hit rates stay high (reloads are index-only).
 

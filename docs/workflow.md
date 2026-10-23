@@ -23,12 +23,12 @@ WorkBuddy (mission control — orchestrator model: kimi-k3-2 recommended)
   │    ultracode tier only for large projects
   │
   ├── HUMAN GATE ── machine-checked, not vibes ──
-  │   the human fills APPROVED.md (PLAN checksum + random token);
+  │   the human fills APPROVED.md (joint fingerprint of PLAN + PROMPT, plus a random token);
   │   the dispatching AI verifies it mechanically before Engine B.
   │   No APPROVED.md → no execution. The AI cannot write it for you.
   │
   ├─→ [Engine B: Goal loop + --effort max]  unattended long-run execution
-  │    → PROGRESS.md self-reported ledger: `id|done|path|bytes|sha256-8`
+  │    → PROGRESS.md self-reported ledger: `id|done|path` (the wrapper computes hashes)
   │    → STAGE-{N}.md checkpoint archives every 5 items
   │    → final-turn self-proof commands pasted into the transcript
   │
@@ -39,7 +39,7 @@ WorkBuddy (mission control — orchestrator model: kimi-k3-2 recommended)
 ## Why files instead of chat
 
 - CLI runs are **stateless** (`-p` spawns a fresh session every time). Files are the only memory.
-- Files make the human gate real: an APPROVED.md with a checksum and a typed token is an auditable artifact; "the AI said the user agreed" is not.
+- Files make the human gate real: an APPROVED.md with a joint fingerprint and a typed token is an auditable artifact; "the AI said the user agreed" is not.
 - Files make monitoring trivial: poll `PROGRESS.md` from anywhere — the desktop assistant, another terminal, a script.
 
 ## Context management: the staged-checkpoint discipline

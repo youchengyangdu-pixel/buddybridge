@@ -1,6 +1,6 @@
 # bb-run.ps1 v2 - BuddyBridge dispatch wrapper (slim)
 # One job: clean env -> isolated config -> stdin prompt -> hard timeout -> real exit code -> COMPLETION.json
-# Gate: APPROVED.md must exist, hash must match PLAN.md, status must be "approved" (flipped to "used" after the run)
+# Gate: APPROVED.md must exist, dispatch_sha256 must cover PLAN.md + PROMPT.md, status "approved" -> "used" at claim time
 #
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File bb-run.ps1 -WorkDir <dir> [-Effort high] [-Model kimi-k3-2] [-MaxTurns 40] [-TimeoutSec 3600] [-SkipGate] [-DryRun]
@@ -235,9 +235,15 @@ if (Test-Path -LiteralPath $ProgressPath) {
       $fi = Get-Item -LiteralPath $p
       $real = (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash.ToLower()
       $entry = [ordered]@{ id=$f[0]; status=$f[1]; path=$p; exists=$true; bytes=$fi.Length; sha256=$real }
-      # compare against the ledger's declared hash when the agent actually wrote one
-      if ($f.Count -ge 5 -and $f[4] -and $f[4] -notmatch '^0+$' -and $f[4] -ne '-') {
-        if ($real.Substring(0,8) -ne $f[4].ToLower()) { $hashMismatch++; $entry.declared_mismatch = $true }
+      # compare only when the agent declared a real hash (8 or 64 hex chars).
+      # Anything else (empty, "-", "00000000", "n/a", prose) is skipped: the agent
+      # has no shell and cannot compute one, and a placeholder must not fake a mismatch.
+      $declared = ''
+      if ($f.Count -ge 5) { $declared = $f[4].Trim().ToLower() }
+      if ($declared -match '^[0-9a-f]{8}$') {
+        if ($real.Substring(0,8) -ne $declared) { $hashMismatch++; $entry.declared_mismatch = $true }
+      } elseif ($declared -match '^[0-9a-f]{64}$') {
+        if ($real -ne $declared) { $hashMismatch++; $entry.declared_mismatch = $true }
       }
       $verified += $entry
     } else {
@@ -247,15 +253,31 @@ if (Test-Path -LiteralPath $ProgressPath) {
   }
 }
 
-# numbering continuity: 1..max(id) must all be present
+# numbering continuity: 1..max(id) must all be present.
+# Guard against date-like ids (e.g. 20260101): enumerate only when max is small.
 $gaps = 0
-if ($ids.Count -gt 0) {
-  $maxId = ($ids | Measure-Object -Maximum).Maximum
-  $gaps = @(1..$maxId | Where-Object { $ids -notcontains $_ }).Count
+$gapsSkipped = $false
+$numericIds = @($ids | Where-Object { $_ -le 100000 })
+$maxId = 0
+if ($numericIds.Count -gt 0) { $maxId = ($numericIds | Measure-Object -Maximum).Maximum }
+if ($maxId -gt 0 -and $maxId -le 100000) {
+  $seen = New-Object 'System.Collections.Generic.HashSet[int]'
+  foreach ($i in $ids) { [void]$seen.Add($i) }
+  for ($k = 1; $k -le $maxId; $k++) { if (-not $seen.Contains($k)) { $gaps++ } }
+} elseif ($maxId -gt 100000) {
+  $gapsSkipped = $true
 }
 
 $tail = @()
 if (Test-Path -LiteralPath $logPath) { $tail = Get-Content -LiteralPath $logPath -Tail 20 -Encoding UTF8 }
+
+# decide rollback BEFORE writing COMPLETION, so the record tells the truth
+# (a CLI that starts and dies within 30s did no work: model missing, credentials expired, etc.)
+$claimRollback = $false
+if ($gateInfo.claimed) {
+  $fastFail = ($status -eq 'EXITED' -and $exitCode -ne 0 -and $sw.Elapsed.TotalSeconds -lt 30)
+  if ($status -eq 'ERROR' -or $fastFail) { $claimRollback = $true }
+}
 
 $completion = [ordered]@{
   run_id = $runId; status = $status; exit_code = $exitCode
@@ -263,20 +285,20 @@ $completion = [ordered]@{
   duration_sec = [math]::Round($sw.Elapsed.TotalSeconds, 1)
   effort = $Effort; model = $Model; max_turns = $MaxTurns
   gate = $gateInfo.status
-  ledger = [ordered]@{ done=$done; failed=$failed; missing_files=$missing; hash_mismatch=$hashMismatch; gaps=$gaps }
+  claim_rolled_back = $claimRollback
+  ledger = [ordered]@{ done=$done; failed=$failed; missing_files=$missing; hash_mismatch=$hashMismatch; gaps=$gaps; gaps_skipped=$gapsSkipped }
   verified = $verified
   log_path = $logPath
   log_tail = ($tail -join "`n")
 }
 WriteJson $completionPath $completion
 
-# rollback the claim only if the wrapper itself failed to start the CLI
-# (a CLI error still counts as consumed - the run did happen)
-if ($gateInfo.claimed -and $status -eq 'ERROR') {
+# rollback the claim when the CLI did no real work (see $claimRollback above)
+if ($claimRollback) {
   $mdBack = Get-Content -LiteralPath $ApprovePath -Raw -Encoding UTF8
-  $mdBack = [regex]::Replace($mdBack, 'status\s*:\s*used', 'status: approved')
+  $mdBack = [regex]::Replace($mdBack, '(?m)^(\s*[-*]?\s*status\s*:\s*)used', '${1}approved', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
   [System.IO.File]::WriteAllText($ApprovePath, $mdBack, (New-Object System.Text.UTF8Encoding($false)))
-  Write-Host '[bb-run] approval rolled back to approved (CLI never started)' -ForegroundColor Yellow
+  Write-Host '[bb-run] approval rolled back to approved (the CLI did no real work)' -ForegroundColor Yellow
 }
 
 foreach ($k in $backup.Keys) { [System.Environment]::SetEnvironmentVariable($k, $backup[$k]) }

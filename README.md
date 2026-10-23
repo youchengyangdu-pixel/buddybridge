@@ -4,7 +4,7 @@
 
 **Turn your desktop AI assistant into mission control. Let CodeBuddy CLI do the grinding.**
 
-BuddyBridge is a discipline, not a daemon: a set of file conventions plus one headless command pattern that lets a desktop AI assistant (WorkBuddy) **plan, review, and approve** — while CodeBuddy CLI agents **research, cross-review, and execute unattended**. The assistant writes the exact command; you paste it into a terminal and walk away; the assistant watches the files and verifies the results. No memory loss between runs, no babysitting terminals.
+BuddyBridge is a discipline, not a daemon: a set of file conventions plus one headless command pattern that lets a desktop AI assistant (WorkBuddy) **plan, review, and approve** — while CodeBuddy CLI agents **research, cross-review, and execute unattended**. The assistant writes the exact command; you paste it into a terminal and walk away; the assistant watches the files and verifies the results. Progress survives between runs via the on-disk ledger (each `-p` is still a fresh session — resumption is idempotent-skip, not session memory), no babysitting terminals.
 
 > **Honest scope**: built and battle-tested for [WorkBuddy](https://www.workbuddy.cn) + [CodeBuddy CLI](https://www.codebuddy.cn/docs/cli) (shared Tencent account). The *pattern* — files as the API, desktop as mission control, a machine-checked human gate — ports to any desktop-assistant + headless-CLI pair. Docs are in English; templates are language-agnostic (fill them in your own language).
 
@@ -20,7 +20,7 @@ WorkBuddy (mission control)
   ├─ writes  REVIEW-BRIEF.md    — multi-agent cross-review assignment
   ├─ writes  RESEARCH-BRIEF.md  — research assignment
   │
-  ├─→ [A1: cross-review]   dozens of parallel reviewer agents, adversarial
+  ├─→ [A1: cross-review]   5 heterogeneous reviewers by default (16 max concurrent), adversarial
   │    peer-critique, multi-vendor model routing (routing disclosed or
   │    flagged) → REVIEW-REPORT.md on disk
   ├─→ [A2: final review]   single-pass by default; ultracode tier for big plans

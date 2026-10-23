@@ -50,7 +50,7 @@ cat done.txt    # 输出 ok = 引擎B 链路通
 
 ```bash
 cd /tmp/bb-test
-codebuddy -p -y --model kimi-k3-2 --effort ultracode --max-turns 20 'ultracode 列出当前目录文件名并把清单写入 files.txt'
+codebuddy -p -y --model kimi-k3-2 --effort high --max-turns 20 'ultracode 列出当前目录文件名并把清单写入 files.txt'
 cat files.txt   # 有产出 = ultracode headless 可用；无产出 → 降级方案（docs/ultracode.md）
 ```
 

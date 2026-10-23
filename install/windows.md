@@ -33,7 +33,7 @@ codebuddy
 把 [`settings.windows.json`](settings.windows.json) 的内容合并进 `C:\Users\<你>\.codebuddy\settings.json`（没有就新建）。三块东西各司其职：
 
 - `defaultMode: "auto"`：**只影响你手动开 TUI 的日常会话**。派发出去的命令一律带 `-y`（等价 `--permission-mode bypassPermissions`），优先级高于 defaultMode —— auto 对挂机运行不生效。
-- `deny` 数组：**挂机唯一可靠的护栏**（deny 永远优先，bypass 之下依然生效）。按需裁剪：任务确需 `git push` 就删那一行，但 `rm -rf` / `sudo` / `.env` / `~/.ssh` 建议永久保留。
+- `deny` 数组：**重要护栏但不是唯一**。Windows 上必须 Bash 与 PowerShell 双写（规则按工具名精确匹配，只写 Bash 对 PowerShell 工具零命中）；更硬的一道是 `--disallowedTools "Bash,PowerShell"`（默认无 shell）；第三道是 `bb-run` 的门控与工具档位。按需裁剪：任务确需 `git push` 就删那一行，但 `rm -rf` / `sudo` / `.env` / `~/.ssh` 建议永久保留。
 - `allow` 白名单：主要服务**引擎A 的 Workflow 子代理**（它们固定跑 acceptEdits、走权限链）。调研类任务必须 `WebSearch` **和** `WebFetch` 双开，缺 WebFetch 则引用验证全挂。
 
 **双配置目录检查**：如果你会从桌面端 AI 会话内派发，先跑 `codebuddy -p '输出环境变量 CODEBUDDY_CONFIG_DIR 的值'` —— 非空则配置要写到**该目录**的 settings.json，不是 ~/.codebuddy/。
@@ -50,7 +50,7 @@ cat .\done.txt    # 输出 ok = 引擎B 全链路通。失败 99% 是漏了 -y
 
 ```powershell
 cd C:\temp\bb-test
-codebuddy -p -y --model kimi-k3-2 --effort ultracode --max-turns 20 'ultracode 列出当前目录文件名并把清单写入 files.txt'
+codebuddy -p -y --model kimi-k3-2 --effort high --max-turns 20 'ultracode 列出当前目录文件名并把清单写入 files.txt'
 cat .\files.txt   # 有产出 = ultracode headless 在你的版本可用；无产出 → 用降级方案（多 -p 分维度），见 docs/ultracode.md
 ```
 

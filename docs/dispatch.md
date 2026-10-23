@@ -5,7 +5,7 @@
 Everything in BuddyBridge reduces to this:
 
 ```
-cd <project dir> && codebuddy -p -y --model <orchestrator> --fallback-model <backup> --effort <level> --max-turns <N> '<self-contained instruction>' > <run.log> 2>&1
+cd <project dir>; codebuddy -p -y --model <orchestrator> --fallback-model <backup> --effort <level> --max-turns <N> '<self-contained instruction>' > <run.log> 2>&1
 ```
 
 | Flag | Why it's there |
@@ -13,7 +13,7 @@ cd <project dir> && codebuddy -p -y --model <orchestrator> --fallback-model <bac
 | `cd <project dir>` first | Explicit working directory. There is **no `--cwd` flag** (verified: v2.158.0 rejects it) — cd decides the trusted-directory boundary and where relative paths land. Never rely on the session's current directory |
 | `-p` | headless: runs to completion and exits. **One run = one brand-new session** (the agent remembers nothing from previous runs) |
 | `-y` | bypassPermissions. Without it the headless agent cannot write files and gives up after one turn. **Not a permission-free pass** — see below |
-| `--model` / `--fallback-model` | Orchestrator model (recommended: `kimi-k3-2`, supports xhigh) + overload backup (e.g. `glm-5.3`). `--fallback-model` is empirical — works in practice, undocumented officially |
+| `--model` / `--fallback-model` | Orchestrator model (recommended: `kimi-k3-2`, supports xhigh) + overload backup (e.g. `glm-5.3`). `--fallback-model` is officially supported, but only takes effect with `--print` |
 | `--effort` | Reasoning depth, no TUI needed. Runtime-legal values: `minimal, low, medium, high, xhigh, max, ultracode` (yes, `ultracode` — `--help` under-prints it; verified against the v2.158.0 bundle's validation whitelist). Engine A uses `ultracode`, Engine B uses `max` |
 | `--max-turns` | Official hard stop-loss for non-interactive runs. Always set it, alongside the semantic `or stop after N turns` clause |
 | `> <run.log> 2>&1` | stdout only flushes at the very end of a `-p` run — without a log file you're blind for the entire duration |

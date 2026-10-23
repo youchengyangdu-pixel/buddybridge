@@ -9,7 +9,8 @@ It is exposed to headless `codebuddy -p` runs (officially stated), **which is wh
 
 ## What UltraCode actually is
 
-1. **Effort tier**: `--effort ultracode` is a **runtime-legal value** (the CLI's validation whitelist includes it; `--help` simply under-prints — verified against the v2.158.0 bundle). Setting it engages a session-level reminder interceptor that tells the model to plan a Dynamic Workflow first for every substantive request. This is the **preferred trigger** — stronger and steadier than the keyword.
+1. **Slash-command tier (interactive only)**: `/effort ultracode` is the only official entry to this tier (`workflows.md`). It is **session-scoped** and resets on a new session. There is **no equivalent CLI flag**: `--effort ultracode` passes argument parsing but does **not** set the workflow tier — `workflowEffortLevel` is assigned only inside the `/effort` executor (verified against the v2.159.0 bundle), and the CLI effort whitelist rejects the value (`--help` lists `minimal…max` only; logs record `--effort option rejected: invalid value`).
+2. **Keyword trigger (the only headless entry)**: the word `ultracode` in the prompt (or plainly saying "use a workflow") triggers a single-shot workflow. This is what the dispatch templates use.
 2. **Keyword trigger**: the word `ultracode` in the user input (or plainly saying "use a workflow") triggers a single-shot workflow. Equivalent opt-in, weaker than the effort tier.
 3. **`xhigh` reasoning** underneath, plus **Dynamic Workflow orchestration**: CodeBuddy writes a JavaScript orchestration script (deterministic sandbox: no `Date.now`, no `Math.random`, no dynamic eval; `require`/`process`/`Buffer` invisible) and the runtime executes it in the background — `agent()` spawns sub-agents, `parallel()` fans out (max 16 concurrent / 1000 per run; fewer on low-core machines), `phase()` groups stages.
 
@@ -32,7 +33,7 @@ The TUI describes it as **"xhigh + workflows"** — that's the accurate one-line
 
 Official docs state workflows work under `codebuddy -p`. They also state plain one-shot `-p` (process exits after the first result) **does not support background tasks** — and workflows belong to the background-task notification family. These two statements sit in tension: does a one-shot `-p` process wait for the workflow to finish before printing the result and exiting? Our baseline tests are on v2.158.0 (2026-09); **if your version's ultracode one-shot doesn't land its output file, don't debug it — switch to the fallback**.
 
-**Verified on v2.158.0 (2026-09-25, Windows)**: `--effort ultracode` is accepted headless (no "unknown option") — the runtime whitelist is real. Behavioral finding: on a trivial task (list-directory-and-write-a-file), the agent **declined to orchestrate a workflow and answered directly** — ultracode's contract is "plan a workflow first for *substantive* requests", so simple tasks skip orchestration by design. Verdict: the effort tier engages; workflow orchestration on genuinely substantive tasks is the remaining unverified case, and the fallback below covers it either way.
+**Verified on v2.159.0 (2026-10-23, Windows)**: `--effort ultracode` parses without an error but does not set the workflow tier; the bundle assigns `workflowEffortLevel` only inside the `/effort` executor, and the effort whitelist rejects the value. What actually engages orchestration headless is the **keyword** in the prompt. Behavioral finding: on a trivial task (list-directory-and-write-a-file), the agent **declined to orchestrate a workflow and answered directly** — ultracode's contract is "plan a workflow first for *substantive* requests", so simple tasks skip orchestration by design. Verdict: use the keyword; the fallback below covers cases where the workflow is not planned.
 
 Also note: for research runs, the official built-in `/deep-research` workflow already implements multi-angle search + cross-verification + claim-voting. Prefer it for standard research; use `ultracode` briefs when you need custom dimensions.
 
@@ -54,7 +55,7 @@ Why this is the default recommendation, not a consolation prize:
 - **Adversarial rounds by construction** — the third run's only job is attacking the first two.
 - **No preview dependency** — the official vendor can reshuffle their preview features; this path never notices.
 
-Treat single-shot `--effort ultracode` as the **acceleration tier** when it works; treat this as the floor that always does.
+Treat the `ultracode` keyword (plus `--effort max` where the model supports it) as the **acceleration tier**; treat this as the floor that always does.
 
 ## Multi-vendor model routing (for workflow-mode reviews)
 

@@ -23,3 +23,6 @@ Thumbs.db
 .idea/
 .vscode/
 docs/outreach-playbook.md
+/probe/
+.workbuddy/
+.buddybridge/

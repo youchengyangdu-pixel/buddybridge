@@ -1,7 +1,7 @@
 # RESEARCH BRIEF：〈调研标题〉
 
 > 派发方式二选一（桌面端 AI 按此执行）：
-> ① **首选**：`codebuddy --cwd <项目> -p -y --model kimi-k3-2 --effort high --max-turns 60 '/deep-research <核心问题>：报告落盘到 <REPORT.md 绝对路径>，每条主张带引用来源'`（官方内置 workflow，已实现多角度并行 + 交叉印证 + 剔除逻辑；需 WebSearch 可用）
+> ① **首选**：`cd <项目绝对路径>; codebuddy -p -y --model kimi-k3-2 --effort high --max-turns 60 '/deep-research <核心问题>：报告落盘到 <REPORT.md 绝对路径>，每条主张带引用来源'`（官方内置 workflow，已实现多角度并行 + 交叉印证 + 剔除逻辑；需 WebSearch 可用；**CLI 没有 `--cwd`**，必须 `cd` 前置）
 > ② **备选**：`ultracode` 关键词现场编排（本文件即其编写规范，自定义维度更灵活；官方研究预览特性，失效时走多 `-p` 分片降级）
 >
 > 本文件无论哪种方式都必须自包含：调研子代理只看得到这里写的东西。产出 REPORT.md 由人验收，「落盘路径」和「引用要求」是硬约定。

@@ -6,6 +6,15 @@ agent_created: true
 
 # BuddyBridge：桌面端 ↔ CodeBuddy CLI 双引擎桥接
 
+## 路径约定（先读）
+
+本 skill 依赖同仓的 `scripts/`、`templates/`、`install/`、`hooks/`。解析顺序：
+
+1. 若本 SKILL.md 同目录存在 `REPO.txt` → 用其中第一行作为仓库根路径（安装到 `~/.workbuddy/skills/buddybridge/` 时由安装脚本写入）；
+2. 否则以当前工作目录为仓库根（在仓库内直接使用时）。
+
+下文所有 `scripts/...`、`templates/...` 路径都相对于该仓库根。**路径含空格/中文时必须整体加引号**（本机工作区就含空格）。
+
 ## 核心理念
 
 桌面端（WorkBuddy）是**任务控制中心**：出题 + 审查 + 终裁 + 验收，不亲自干重活。
@@ -13,8 +22,8 @@ CodeBuddy CLI 是**两个外派引擎**：
 
 | 引擎 | 命令形态 | 适用任务 | 关键特性 |
 |---|---|---|---|
-| **引擎A：UltraCode Workflow** | `--effort ultracode` + 任务书 | 调研 / 批量分析 / 交叉验证 / 多代理交叉审查 | 数十~数百子代理并行、对抗式互评、引用交叉印证、中间结果不占上下文 |
-| **引擎B：Goal 循环** | `--effort max` + `/goal` | 挂机长任务 / 清单逐条执行 / 批量生产 | 顺序验收、PROGRESS.md 即账本、**可断点续跑** |
+| **引擎A：UltraCode Workflow** | prompt 含 `ultracode` 关键词（**不是** `--effort ultracode`，该值被拒）+ 任务书 | 调研 / 批量分析 / 交叉验证 / 多代理交叉审查 | 最多 16 并发子代理（默认 5 路）、对抗式互评、引用交叉印证、中间结果不占上下文 |
+| **引擎B：Goal 循环** | `--effort max` + `/goal` | 挂机长任务 / 清单逐条执行 / 批量生产 | 顺序验收、PROGRESS.md 即账本、**续跑靠幂等跳过（每次 -p 是全新会话）** |
 
 **选型一句话**：要「多个脑子同时想、互相挑刺」→ 引擎A；要「按清单顺序干完、干完记账」→ 引擎B；大型项目 A 调研 → 转成 PLAN → 审查 → 拍板 → B 执行。
 
@@ -60,7 +69,7 @@ CodeBuddy CLI 是**两个外派引擎**：
 
 **A1 交叉审查（ultracode 加速档）**：
 ```powershell
-cd <项目绝对路径>; codebuddy -p -y --model kimi-k3-2 --fallback-model glm-5.3 --effort ultracode --max-turns 60 'ultracode 按 <REVIEW-BRIEF.md 绝对路径> 交叉审查 <PLAN.md 绝对路径>：按任务书维度各自独立审查 + 对抗式互评；任务开始先落 REVIEW-REPORT.md 骨架（状态 running + 开始时间），终稿落盘同路径；每条发现标注产生它的模型 ID；执行元数据节列实际模型清单与是否降级' > <review.log> 2>&1
+cd <项目绝对路径>; codebuddy -p -y --model kimi-k3-2 --fallback-model glm-5.3 --effort high --max-turns 60 'ultracode 按 <REVIEW-BRIEF.md 绝对路径> 交叉审查 <PLAN.md 绝对路径>：按任务书维度各自独立审查 + 对抗式互评；任务开始先落 REVIEW-REPORT.md 骨架（状态 running + 开始时间），终稿落盘同路径；每条发现标注产生它的模型 ID；执行元数据节列实际模型清单与是否降级' > <review.log> 2>&1
 ```
 
 **A1 降级版（默认推荐，必然生效）**—— 多 `-p` 分维度 + 对抗轮，天然多厂商盲审：
@@ -155,7 +164,7 @@ cd <项目绝对路径>; codebuddy -p -y --model kimi-k3-2 --fallback-model glm-
 - **Windows**：PowerShell goal 文本用单引号（bash/zsh 双引号），路径正斜杠；孤儿进程 Get-CimInstance + taskkill；无 Bash 沙箱，但有 `--sandbox container`（Docker/Podman，Beta）与 `--worktree` 跨平台隔离可选
 - **macOS**：zsh 单引号写法同 PowerShell；`sandbox.enabled: true` + `allowUnsandboxedCommands: false`（沙箱越权重试默认允许，必须显式关掉才是硬边界）+ `autoAllowBashIfSandboxed`（注意其自动批准机制以 acceptEdits 模式为前提，bypass 挂机下真实收益是文件系统/网络隔离本身）
 - **双配置目录**：`CODEBUDDY_CONFIG_DIR` 指向别处时 CLI 读对应目录 settings.json（桌面端宿主环境常见）—— 流程零第 4 步实测确认
-- `--serve` 独占认证锁 / `--fallback-model` 为**实测经验，官方文档未载**
+- `--serve` 独占认证锁；`--fallback-model` 官方支持，但**仅 `--print` 生效**
 
 ## 快查：完整派发决策树
 

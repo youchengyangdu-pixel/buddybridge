@@ -16,7 +16,7 @@ Source: official `workflows.md` comparison table, lightly edited.
 ## Why BuddyBridge maps engines the way it does
 
 - **Engine A = Workflows** for research/review: parallel fan-out + adversarial peer-critique are exactly what "many brains critiquing each other" needs, and script-held plans keep intermediate results out of the orchestrator's context. The fallback (multi-`-p` + `--model`) is the same topology built from sub-agent-style single runs — guaranteed vendor-heterogeneous routing.
-- **Engine B = Goal loop** (not in the table — it's a session-level construct, not a delegation primitive): the plan lives in the *evaluator's* turn-by-turn judgment plus the on-disk PLAN/PROGRESS ledger. That's what makes it **resumable across process restarts** — the property Workflows explicitly lack ("process exit = run gone"). Checklist execution values resumability over parallelism, hence Engine B.
+- **Engine B = Goal loop** (not in the table — it's a session-level construct, not a delegation primitive): the plan lives in the *evaluator's* turn-by-turn judgment plus the on-disk PLAN/PROGRESS ledger. That is what makes it **appear resumable across process restarts** (each `-p` is a fresh session; resumption is idempotent-skip against the ledger) — the property Workflows explicitly lack ("process exit = run gone"). Checklist execution values resumability over parallelism, hence Engine B.
 - **Skills = how the bridge itself is taught**: the buddybridge SKILL.md is an instruction artifact for the desktop assistant, not an execution engine.
 - **Agent Teams**: peer coordination with a leader — v2 roadmap territory (multi-task orchestration panel), not needed for the single-task dispatch loop of v1.
 

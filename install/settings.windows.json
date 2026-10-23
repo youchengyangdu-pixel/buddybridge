@@ -75,17 +75,18 @@
       "PowerShell(Move-Item)",
       "PowerShell(Move-Item:*)",
 
-      "Edit(.git/**)",
-      "Edit(.codebuddy/**)",
-      "Edit(.workbuddy/**)",
-      "Edit(.mcp.json)",
-      "Edit(.env*)",
-      "Edit(APPROVED.json)",
-      "Read(.env*)",
-      "Read(~/.ssh/**)",
-      "Read(~/.aws/**)",
-      "Read(~/.codebuddy/**)",
-      "Read(~/.workbuddy/**)"
+      "Edit(**/.git/**)",
+      "Edit(**/.codebuddy/**)",
+      "Edit(**/.workbuddy/**)",
+      "Edit(**/.mcp.json)",
+      "Edit(**/.env*)",
+      "Edit(**/APPROVED.json)",
+      "Edit(**/APPROVED.md)",
+      "Read(**/.env*)",
+      "Read(**/.ssh/**)",
+      "Read(**/.aws/**)",
+      "Read(**/.codebuddy/**)",
+      "Read(**/.workbuddy/**)"
     ]
   }
 }

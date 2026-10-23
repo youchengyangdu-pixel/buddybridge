@@ -1,33 +1,42 @@
 # Automation 轮询模板（跨会话自动回传）
 
-> 用法：把本文件内容作为 WorkBuddy automation 的 prompt（一次性或周期性任务）。
-> 关键：prompt 必须自包含 —— 未来执行时看不到当前对话。
+> 用法：把下面的正文作为 WorkBuddy automation 的 prompt（周期性，建议 10-15 分钟一次）。
+> prompt 必须自包含 —— 未来执行时看不到当前对话。
 
 ## 模板正文（复制到 automation 的 prompt）
 
 ```
-检查 BuddyBridge 派发任务的完成情况，并把结果告诉我。
+检查 BuddyBridge 派发任务的完成情况，有新结果才告诉我。
 
 监控目录：<WORKDIR>
-预期验收项数：<N>
 
-按以下顺序判断：
-1. 读 <WORKDIR>/.buddybridge/LATEST.json，取 run_dir 与 run_id。
-2. 如果 run_dir/COMPLETION.json 不存在：
-   - 读 <WORKDIR>/PROGRESS.md 的修改时间，若距今超过 30 分钟，报告「STALLED，进度已静默 X 分钟」并附 PROGRESS 最后 5 行；
-   - 否则不要打扰我，回复一行「仍在运行」即可。
-3. 如果 COMPLETION.json 存在：
-   - exit_code != 0 → 报告「FAILED，exit=X」，附 COMPLETION 的 log_tail 最后 10 行；
-   - exit_code == 0 但 ledger.done < N → 报告「INCOMPLETE，完成 X/N」，列出缺的编号；
-   - exit_code == 0 且 done >= N → 报告「DONE」，附 ledger 统计与产物目录；
-   - 若 run_dir/NOTIFIED.json 已存在且状态未变，不要重复通知，只回复「无变化」。
-
-报告写成三行以内：状态 / 关键数字 / 下一步建议。
+步骤：
+1. 列出 <WORKDIR>\.buddybridge\runs\ 下的子目录，取名字最大的那个（时间戳命名）。
+2. 读其中的 COMPLETION.json：
+   - 不存在 → 读 <WORKDIR>\PROGRESS.md 的修改时间；距今超过 30 分钟才报告「疑似卡住，进度静默 X 分钟」，否则只回一行「仍在运行」。
+   - 存在 → 提取 run_id / status / exit_code / duration_sec / ledger / log_tail。
+3. 去重：读 <WORKDIR>\.buddybridge\notified.log（不存在就当空）。如果里面已有该 run_id，只回一行「已汇报过」。
+   没有则把该 run_id 追加进去，然后报告。
+4. 报告格式（三行以内）：
+   状态：DONE / FAILED / TIMEOUT / INCOMPLETE
+   数字：exit=… done=…/N 用时=…s
+   下一步：建议动作（验收 / 看 log_tail / 缩短范围重派）
 ```
 
-## 落地要点
+## 状态对照（与 bb-run 一致）
 
-1. **幂等**：automation 每次执行会写 `run_dir/NOTIFIED.json`（记录上次通知的状态与时间），状态没变就不重复打扰。
-2. **不依赖 hooks**：只读文件，所以 Git Bash 不可用也能工作（探针实测 bash 不在 PATH）。
-3. **周期建议**：长任务 10-15 分钟一次；短任务改用会话内 `bb-watch.ps1`（更实时）。
-4. **与桌面端会话解耦**：automation 独立运行，即使当前对话关了也能报。
+| COMPLETION.status | exit_code | 含义 |
+|---|---|---|
+| EXITED | 0 | 正常结束（再看 ledger.done 是否等于 N） |
+| EXITED | ≠0 | CLI 报错退出，看 log_tail |
+| TIMEOUT | 124 | 被硬超时杀掉，任务太长或卡死 |
+| ERROR | 1 | 包装器自身异常（看 log_tail 的 stderr 段） |
+
+## 为什么不用 hooks
+
+实测（2026-10-23）：`-p` 模式下 Stop / PostToolUse hook 均不触发，且 Git Bash 不在 PATH。所以回传只依赖文件轮询，不依赖任何 hook。
+
+## 与旧版差异
+
+- 不依赖 `LATEST.json`（已删除）—— 直接扫 `runs\` 目录取最新
+- 去重靠 `notified.log`（automation 自己写），不依赖没人写的 `NOTIFIED.json`

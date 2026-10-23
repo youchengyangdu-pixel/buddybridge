@@ -27,7 +27,7 @@ CodeBuddy CLI 是**两个外派引擎**：
 
 **选型一句话**：要「多个脑子同时想、互相挑刺」→ 引擎A；要「按清单顺序干完、干完记账」→ 引擎B；大型项目 A 调研 → 转成 PLAN → 审查 → 拍板 → B 执行。
 
-**主编排模型**：推荐 `kimi-k3-2`（长上下文 + 多步规划 + 工具调用三强，且支持 ultracode 所需的 xhigh 推理；`--help` 漏印 ultracode 但运行时合法）。配 `--fallback-model` 备胎（如 glm-5.3）防过载断线。审查子代理按 REVIEW-BRIEF 路由表分散到**不同厂商**模型 —— 主编排强单脑 + 盲审异构多脑，各取所长。
+**主编排模型**：推荐 `kimi-k3-2`（长上下文 + 多步规划 + 工具调用三强；注意其 supportedEfforts 上限是 `high`，传 `max` 会被截断）。配 `--fallback-model` 备胎（如 glm-5.3）防过载断线。审查子代理按 REVIEW-BRIEF 路由表分散到**不同厂商**模型 —— 主编排强单脑 + 盲审异构多脑，各取所长。
 
 **降级总原则**：引擎A 依赖官方「研究预览」特性（Dynamic Workflows，v2.105.0+）。若 ultracode 在你的版本/账号不生效，**降级方案必然生效**（见深水区「多 -p 降级」），项目核心（文件契约 + 人工门控 + 进度自曝）不依赖任何 preview 特性。
 
@@ -95,7 +95,7 @@ cd <项目绝对路径>; codebuddy -p -y --model kimi-k3-2 --effort high --max-t
 
 **备选（ultracode 现场编排，自定义维度更灵活）**：
 ```powershell
-cd <项目绝对路径>; codebuddy -p -y --model kimi-k3-2 --fallback-model glm-5.3 --effort ultracode --max-turns 60 'ultracode 按 <RESEARCH-BRIEF.md 绝对路径> 调研：先落 REPORT.md 骨架（running+时间戳）；终稿每条主张带引用来源，未通过交叉印证的主张明确剔除' > <research.log> 2>&1
+cd <项目绝对路径>; codebuddy -p -y --model kimi-k3-2 --fallback-model glm-5.3 --effort high --max-turns 60 'ultracode 按 <RESEARCH-BRIEF.md 绝对路径> 调研：先落 REPORT.md 骨架（running+时间戳）；终稿每条主张带引用来源，未通过交叉印证的主张明确剔除' > <research.log> 2>&1
 ```
 
 不支持 /deep-research 或 disableWorkflows 时 → 用 A1 同款「多 -p 降级」按子问题分片调研。
@@ -104,22 +104,29 @@ cd <项目绝对路径>; codebuddy -p -y --model kimi-k3-2 --fallback-model glm-
 
 **前置检查（顺序执行，任一失败即停）**：
 1. PLAN.md 验收项逐条可验证（存在客观判据；含「依赖顺序」与「失败与回滚处置」两节非空）
-2. **APPROVED.md 机检**（铁律 1）：存在 + hash 一致 + token 一致
-3. 派发方从 PLAN.md **数出实际验收项数并替换命令中的 N**（禁止下发占位符 N）
-4. allow 白名单 / deny 基线已按 install 卡配置
+2. 把任务书写进 `<项目>\PROMPT.md`（模板见 `templates/PROMPT.md`）—— **永不把任务文本内联进命令行**
+3. 人填 `APPROVED.md`：`plan_sha256`（PLAN 前 12 位）+ `token` + `status: approved`（`bb-run` 会机检并消费）
+4. 派发方从 PLAN.md 数出验收项数 N，写进 PROMPT.md 的结束条件
 
+**派发（唯一入口，不要手拼 codebuddy 命令）**：
 ```powershell
-cd <项目绝对路径>; codebuddy -p -y --model kimi-k3-2 --fallback-model glm-5.3 --effort max --max-turns 200 '/goal 按 <PLAN.md 绝对路径> 逐条执行：先读 <PROGRESS.md 绝对路径>，某编号已有 done 记录且产物 sha256 前 8 位一致则跳过；每完成一项：先产出完整文件，再计算其字节数与 sha256 前 8 位，然后向进度文件追加一行「编号|done|产物路径|字节数|sha256前8位」；每完成 5 项执行阶段收口：把本阶段完整产物与状态写入 STAGE-{序号}.md，并在对话中输出当前状态自述（已完成编号/关键结论/下一阶段）；最后一轮必须执行 cat 进度文件 与 ls 产物目录 并把输出贴进对话作为达成证据；全部 N 项在进度文件均有 done 且产物存在时判定达成, or stop after 40 turns' > <run.log> 2>&1
+powershell -ExecutionPolicy Bypass -File <仓库>\scripts\bb-run.ps1 -WorkDir "<项目绝对路径>" -Effort max -Model kimi-k3-2 -MaxTurns 200 -TimeoutSec 7200
 ```
+
+`bb-run` 已经内置：`-y`、`--effort`、环境净化（清宿主注入的 MCP/会话身份/FORCE 两个 bundle 开关）、独立配置目录（含 deny 护栏）、`--strict-mcp-config`、stdin 传 prompt（UTF-8，防中文乱码）、硬超时 + 真实退出码、`COMPLETION.json`（含账本核对与产物 sha256）。
+
+**账本纪律**：agent 只写 `<编号>|done|<产物绝对路径>||||`（后三列留空）。**不要要求 agent 自己算 sha256** —— 默认档不授予 shell，它算不出来只会编；校验值由 `bb-run` 收尾时统一计算并写进 `COMPLETION.json.verified`。
 
 **阶段收口的作用**：完整版永远在磁盘（STAGE-*.md），最新版永远在 transcript 尾部（状态自述）—— 官方 auto-compact 压缩旧轮次时**吃不掉证据**，goal 评估器始终能看到最近的自述。重载克制：旧细节从 STAGE 文件按需读回，**只回注索引/摘要，禁止整段塞回**（保前缀缓存命中）。
 
-## 流程四：MONITOR（实时监控）
+## 流程四：MONITOR（监控）
 
-轮询三样（不要干等 stdout —— `-p` 全部跑完才一次性输出，**中途静默是正常的，静默 ≠ 死了，禁止凭静默重派**）：
-1. **REPORT/REVIEW-REPORT/PROGRESS 骨架心跳**：任务书要求 agent 开始时先落骨架文件（状态 running + 开始时间）→ 骨架存在但终稿未出 = 还在跑；骨架时间戳超 30 分钟无更新 = 疑似挂死 → 查进程
-2. **PROGRESS.md 逐行新增**：每完成一项一行，向用户播报「X/N 项 + 最近产物」
-3. **run.log 尾部**：`Get-Content <log> -Tail 20`；`--output-format stream-json` 可选（长连接形态才有跨轮事件，纯 -p 单发拿不到后台任务事件，以文件轮询为准）
+轮询两样（不要干等 stdout —— `-p` 全部跑完才一次性输出，**中途静默是正常的，静默 ≠ 死了，禁止凭静默重派**）：
+
+1. **`PROGRESS.md` 逐行新增**：每完成一项一行，向用户播报「X/N 项 + 最近产物」。文件修改时间即心跳（超过 30 分钟无更新 = 疑似挂死 → 查进程）。
+2. **`.buddybridge\runs\<最新>\COMPLETION.json`**：出现即终态 —— `status`（EXITED/TIMEOUT/ERROR）、`exit_code`、`duration_sec`、`ledger`、`verified`、`log_tail`。这是唯一带退出码的真相来源。
+
+跨会话（关了对话也要收通知）：用 `templates/AUTOMATION-POLL.md` 配一个周期性 automation，只报状态变化。
 
 **goal 三态处置**：
 - `✔ Goal achieved` → 进流程五
@@ -128,9 +135,9 @@ cd <项目绝对路径>; codebuddy -p -y --model kimi-k3-2 --fallback-model glm-
 
 ## 流程五：VERIFY（验收）
 
-1. **账本核对（防伪造）**：逐行重算产物 sha256 前 8 位与 PROGRESS 记录比对（不一致 = 伪造或被改写）；零空号；**随机抽 1 项由桌面端亲自打开产物核对内容是否符合 PLAN 该项验收标准**（不只看文件存在）
-2. **进程清查**：Windows `Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Where-Object {$_.CommandLine -like '*codebuddy*'}` → 残留 `taskkill /PID <pid> /F`（PowerShell 执行，Git Bash `//PID` 报错）；macOS/Linux `ps aux | grep codebuddy` → `kill <pid>`。多任务并发时**只 kill 本次记录的 PID**，全量扫描仅作异常发现
-3. **异常处置**：run.log 出现 permission/denied/需要确认 → 高危命令被拦（改 PLAN 绕开，不是指令问题）；无 Goal achieved 但进程已退 → 认证失败挂住 / turns 耗尽 / 条件写法不可证明（评估器只读对话不读文件，条件必须写成 agent 能在对话中自证的形式）
+1. **账本核对**：读 `COMPLETION.json` 的 `verified` 数组（wrapper 已对每个产物算过真实 sha256）→ 核对 `ledger.missing_files` 与 `failed` 是否为 0；**随机抽 1 项由桌面端亲自打开产物核对内容是否符合 PLAN 该项验收标准**（不只看文件存在）
+2. **进程清查**：`Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Where-Object {$_.CommandLine -like '*buddybridge*'}` 仅作异常发现；清理由 `bb-run` 的硬超时自动完成（`taskkill /T /F`），不手工杀
+3. **异常处置**：`COMPLETION.status=TIMEOUT` → 任务太长或条件不可达，缩短范围重派；`exit_code≠0` → 读 `log_tail` 判断是护栏拦截（改 PLAN 绕开）还是认证/网络问题
 
 ---
 
@@ -138,7 +145,7 @@ cd <项目绝对路径>; codebuddy -p -y --model kimi-k3-2 --fallback-model glm-
 
 ### UltraCode（引擎A）机制 —— 实测与官方口径
 - **官方定位**：Dynamic Workflows v2.105.0 引入，**研究预览阶段**（官方原话）；ultracode effort 档叠加其上（v2.118.1 起 /effort 面板支持）。/config 有「Dynamic workflows」与「Ultracode keyword trigger」**两个独立开关**，派发异常先查这两个
-- **触发三级**：① `--effort ultracode`（**首选**：运行时合法值 + 会话级 reminder 注入，`--help` 漏印但校验白名单实证）② prompt 含 `ultracode` 关键词或明说「用一个 workflow 跑这个」（单次触发）③ `/effort ultracode`（交互态会话级，headless 不适用）
+- **触发方式（headless）**：只有 prompt 含 `ultracode` 关键词或明说「用一个 workflow 跑这个」这一条有效；`--effort ultracode` 会被 effort 白名单拒绝（`--help` 只列 minimal…max），`/effort ultracode` 仅交互态（会话级，headless 不适用）
 - **本质**：CodeBuddy 现场写 JS 编排脚本（确定性沙箱：禁 Date.now/Math.random/动态求值/require/process/Buffer），`agent()` 派子代理、`parallel()` 并行（上限 16 并发 / 1000 每 run，低核机器更少）、`phase()` 分阶段
 - **权限**：`-p`/Bypass/SDK 下 Workflow 永不询问直接开跑；子代理固定 acceptEdits（文件自动批）+ 继承白名单 —— 白名单外的 Shell/WebFetch/MCP 在 headless 下无交互入口，按权限链判定（通常拒）
 - **headless 时序张力（实测待验证项）**：workflows.md 说 -p 可用 vs headless.md 说纯 -p 单发不支持后台任务。本项目实测基线 v2.158.0；若你的版本 ultracode 单发未落盘产物 → 走降级方案（多 -p 分维度）

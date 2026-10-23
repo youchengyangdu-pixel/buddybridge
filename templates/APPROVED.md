@@ -1,12 +1,36 @@
-# APPROVED
+# 批准凭证（APPROVED）
 
-> 填写说明：本文件是**人工终裁的拍板凭证**，是引擎B（执行）派发的唯一放行条件。
-> **必须由人填写或人在桌面端 AI 面前逐字口述、由人确认后落盘 —— AI 不得代写、不得代填、不得提示措辞。**
-> 派发前桌面端 AI 必须机械校验：① 本文件存在 ② 计划校验值与 PLAN.md 当前内容实际计算的 sha256 一致 ③ 拍板人声明包含本轮生成的随机 token。任一不满足 → 拒绝派发。
+> 这是**唯一**的放行凭证。`bb-run.ps1` 只读三项：`plan_sha256` / `status` / `expires`。
+> 执行成功后脚本会把 `status: approved` 改写为 `status: used` —— 同一份凭证不能再用第二次。
 
-- 被审计划：〈PLAN.md 绝对路径〉
-- 计划版本：v〈N〉
-- 计划校验：〈sha256 前 12 位 —— PowerShell: `(Get-FileHash '<PLAN.md>' -Algorithm SHA256).Hash.Substring(0,12).ToLower()`；macOS/Linux: `shasum -a 256 '<PLAN.md>' | cut -c1-12`〉
-- 审查报告：〈REVIEW-REPORT.md 绝对路径〉
-- 拍板时间：〈ISO8601，例 2026-09-25T18:30:00+08:00〉
-- 拍板人声明：〈用户手打一句话，必须原样包含桌面端本轮给出的随机 token：〈TOKEN〉〉
+- plan_sha256: 000000000000
+- token: 0000000000000000
+- status: approved
+- issued_at: 2026-01-01T00:00:00+08:00
+- expires: 2026-01-02T00:00:00+08:00
+- 拍板人: <你的名字>
+- 备注: <为什么批准这一版>
+
+## 怎么填
+
+```powershell
+# 1) PLAN 的校验值（前 12 位）
+(Get-FileHash .\PLAN.md -Algorithm SHA256).Hash.Substring(0,12).ToLower()
+
+# 2) 随机 token（16 位 hex）
+-join ((1..16) | ForEach-Object { '{0:x}' -f (Get-Random -Max 16) })
+```
+
+把两个结果抄进上面的 `plan_sha256` 和 `token`，`status` 保持 `approved`。
+`expires` 可选；写了就按时间失效，不写就只靠 `used` 防重放。
+
+## 为什么要人填
+
+`bb-run` 不替你生成 hash —— 因为你（人）必须**真的看过 PLAN.md** 才能批准。
+脚本自动填 = 门控变成自动盖章，等于没有门控。
+
+## 注意
+
+- 改了 `PLAN.md` 任意一个字节，旧 hash 立即失效（脚本会拒绝并报出两个值）。
+- 同一份 `APPROVED.md` 跑第二次会被拒（`status: used`）。
+- `Edit(**/APPROVED.md)` 在 deny 列表里，执行 agent 改不了这份文件。

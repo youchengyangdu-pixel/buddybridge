@@ -42,6 +42,20 @@ $completionPath = Join-Path $runDir 'COMPLETION.json'
 
 if (-not (Test-Path -LiteralPath $PromptPath)) { Fail 'PROMPT.md missing - write the task text to that file (see templates/PROMPT.md)' 3 }
 
+# ---------- guard settings must live in the isolated config dir ----------
+# Done BEFORE the gate: a broken settings template must never burn an approval.
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$tpl = Join-Path $repoRoot 'install\settings.windows.json'
+$bbSettings = Join-Path $homeCfg 'settings.json'
+if (Test-Path -LiteralPath $tpl) {
+  try {
+    $cfg = Get-Content -LiteralPath $tpl -Raw -Encoding UTF8 | ConvertFrom-Json
+    [System.IO.File]::WriteAllText($bbSettings, ($cfg | ConvertTo-Json -Depth 8), (New-Object System.Text.UTF8Encoding($false)))
+  } catch {
+    Fail ('settings template is not valid JSON: ' + $tpl + ' - fix it before dispatching') 21
+  }
+}
+
 # ---------- gate: APPROVED.md (single carrier, human-readable) ----------
 # Fingerprint covers BOTH files: approving PLAN.md but swapping PROMPT.md must fail.
 # PROMPT is read ONCE here and that exact byte array is fed to the CLI later,
@@ -118,15 +132,6 @@ if (-not $SkipGate) {
   $gateInfo.token = $tm.Groups[1].Value
 } else {
   Write-Host '[bb-run] WARNING: gate SKIPPED - this dispatch has no approval and no plan lock' -ForegroundColor Red
-}
-
-# ---------- guard settings must live in the isolated config dir ----------
-$repoRoot = Split-Path -Parent $PSScriptRoot
-$tpl = Join-Path $repoRoot 'install\settings.windows.json'
-$bbSettings = Join-Path $homeCfg 'settings.json'
-if (Test-Path -LiteralPath $tpl) {
-  $cfg = Get-Content -LiteralPath $tpl -Raw -Encoding UTF8 | ConvertFrom-Json
-  [System.IO.File]::WriteAllText($bbSettings, ($cfg | ConvertTo-Json -Depth 8), (New-Object System.Text.UTF8Encoding($false)))
 }
 
 # ---------- clean environment ----------
@@ -279,11 +284,13 @@ if ($maxId -gt 100000) {
 $tail = @()
 if (Test-Path -LiteralPath $logPath) { $tail = Get-Content -LiteralPath $logPath -Tail 20 -Encoding UTF8 }
 
-# decide rollback BEFORE writing COMPLETION, so the record tells the truth
-# (a CLI that starts and dies within 30s did no work: model missing, credentials expired, etc.)
+# decide rollback BEFORE writing COMPLETION, so the record tells the truth.
+# A fast non-zero exit is NOT proof of "no work": the agent may have written products
+# and a ledger, then failed one criterion. Only roll back when nothing was left behind.
 $claimRollback = $false
 if ($gateInfo.claimed) {
-  $fastFail = ($status -eq 'EXITED' -and $exitCode -ne 0 -and $sw.Elapsed.TotalSeconds -lt 30)
+  $didWork = (($done + $failed) -gt 0) -or (@($verified | Where-Object { $_.exists }).Count -gt 0)
+  $fastFail = ($status -eq 'EXITED' -and $exitCode -ne 0 -and $sw.Elapsed.TotalSeconds -lt 30 -and -not $didWork)
   if ($status -eq 'ERROR' -or $fastFail) { $claimRollback = $true }
 }
 

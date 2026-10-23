@@ -33,7 +33,7 @@
 | ERROR | 1 | 包装器自身异常（看 log_tail 的 stderr 段） |
 
 **另外三个字段要一起看**：
-- `claim_rolled_back=true` → 这次派发没真正干活，批准已退回 `approved`，可以直接重派
+- `claim_rolled_back=true` → 包装器判定这次**没留下任何产物或账本**（且 30 秒内非零退出 / 自身异常），批准已退回 `approved`。确认目标目录确实没有新产物后才可重派
 - `ledger.hash_mismatch>0` → 账本里声明的 hash 与实际不符（要么产物被改，要么 agent 编了值）
 - `ledger.gaps>0` → 编号有空号（有验收项根本没跑）；`gaps_skipped=true` 表示编号是日期式，需人工确认
 

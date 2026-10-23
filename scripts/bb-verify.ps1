@@ -26,8 +26,11 @@ function New-Case($name) {
 }
 
 function Set-Sha($dir) {
-  $h = (Get-FileHash -LiteralPath (Join-Path $dir 'PLAN.md') -Algorithm SHA256).Hash.Substring(0,12).ToLower()
-  return $h
+  # dispatch fingerprint covers BOTH files: sha256(plan_sha + ':' + prompt_sha) first 12 chars
+  $p = (Get-FileHash -LiteralPath (Join-Path $dir 'PLAN.md') -Algorithm SHA256).Hash.ToLower()
+  $q = (Get-FileHash -LiteralPath (Join-Path $dir 'PROMPT.md') -Algorithm SHA256).Hash.ToLower()
+  $h = [System.Security.Cryptography.SHA256]::Create().ComputeHash([System.Text.Encoding]::ASCII.GetBytes($p + ':' + $q))
+  return (-join ($h | ForEach-Object { $_.ToString('x2') })).Substring(0,12)
 }
 
 # ---------- case 1: no APPROVED.md -> expect exit 10 ----------
@@ -49,7 +52,7 @@ Set-Content -LiteralPath (Join-Path $d2 'PLAN.md') -Value "# PLAN`n1. create out
 Set-Content -LiteralPath (Join-Path $d2 'PROMPT.md') -Value "Create out.txt in the current directory containing exactly: hello`nThen append one line to PROGRESS.md: 1|done|<absolute path to out.txt>||||`nThen stop." -Encoding UTF8
 $h2 = Set-Sha $d2
 $tok2 = -join ((1..16) | ForEach-Object { '{0:x}' -f (Get-Random -Max 16) })
-$md2 = "plan_sha256: $h2`ntoken: $tok2`nstatus: approved`nexpires: " + (Get-Date).AddHours(1).ToString('o')
+$md2 = "dispatch_sha256: $h2`ntoken: $tok2`nstatus: approved`nexpires: " + (Get-Date).AddHours(1).ToString('o')
 Set-Content -LiteralPath (Join-Path $d2 'APPROVED.md') -Value $md2 -Encoding UTF8
 & $runner -WorkDir $d2 -Effort high -MaxTurns 12 -TimeoutSec 240 *> $null
 $code2 = $LASTEXITCODE

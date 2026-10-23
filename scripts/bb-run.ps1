@@ -43,16 +43,25 @@ $completionPath = Join-Path $runDir 'COMPLETION.json'
 if (-not (Test-Path -LiteralPath $PromptPath)) { Fail 'PROMPT.md missing - write the task text to that file (see templates/PROMPT.md)' 3 }
 
 # ---------- gate: APPROVED.md (single carrier, human-readable) ----------
-$gateInfo = [ordered]@{ checked = $false; status = 'skipped' }
+# Fingerprint covers BOTH files: approving PLAN.md but swapping PROMPT.md must fail.
+function Get-DispatchSha12($planFile, $promptFile) {
+  $p = (Get-FileHash -LiteralPath $planFile -Algorithm SHA256).Hash.ToLower()
+  $q = (Get-FileHash -LiteralPath $promptFile -Algorithm SHA256).Hash.ToLower()
+  $seed = [System.Text.Encoding]::ASCII.GetBytes($p + ':' + $q)
+  $h = [System.Security.Cryptography.SHA256]::Create().ComputeHash($seed)
+  return (-join ($h | ForEach-Object { $_.ToString('x2') })).Substring(0, 12)
+}
+
+$gateInfo = [ordered]@{ checked = $false; status = 'skipped'; claimed = $false }
 if (-not $SkipGate) {
   if (-not (Test-Path -LiteralPath $ApprovePath)) { Fail 'APPROVED.md missing' 10 }
   if (-not (Test-Path -LiteralPath $PlanPath)) { Fail 'PLAN.md missing' 11 }
   $md = Get-Content -LiteralPath $ApprovePath -Raw -Encoding UTF8
-  $hm = [regex]::Match($md, 'plan_sha256\s*:\s*([0-9a-fA-F]{12})')
+  $hm = [regex]::Match($md, 'dispatch_sha256\s*:\s*([0-9a-fA-F]{12})')
   $tm = [regex]::Match($md, 'token\s*:\s*([0-9a-fA-F]{8,32})')
   $sm = [regex]::Match($md, 'status\s*:\s*([A-Za-z]+)')
   $em = [regex]::Match($md, 'expires\s*:\s*([0-9T:+\-\.]{10,40})')
-  if (-not $hm.Success) { Fail 'APPROVED.md has no plan_sha256' 12 }
+  if (-not $hm.Success) { Fail 'APPROVED.md has no dispatch_sha256 (it must cover PLAN.md + PROMPT.md)' 12 }
   if (-not $tm.Success) { Fail 'APPROVED.md has no token' 13 }
   if (-not $sm.Success) { Fail 'APPROVED.md has no status' 14 }
   $status = $sm.Groups[1].Value.ToLower()
@@ -63,13 +72,24 @@ if (-not $SkipGate) {
       if ([DateTimeOffset]::Now -gt $exp) { Fail 'APPROVED.md expired' 16 }
     } catch { }
   }
-  $actual = (Get-FileHash -LiteralPath $PlanPath -Algorithm SHA256).Hash.ToLower().Substring(0, 12)
+  $actual = Get-DispatchSha12 $PlanPath $PromptPath
   if ($hm.Groups[1].Value.ToLower() -ne $actual) {
-    Fail ('PLAN hash mismatch: approved=' + $hm.Groups[1].Value.ToLower() + ' actual=' + $actual) 17
+    Fail ('dispatch hash mismatch: approved=' + $hm.Groups[1].Value.ToLower() + ' actual=' + $actual + ' (covers PLAN.md + PROMPT.md)') 17
+  }
+  # claim-at-gate: flip to used NOW, so two concurrent runs cannot both pass.
+  # A dry run must NOT consume the approval.
+  if (-not $DryRun) {
+    $mdUsed = [regex]::Replace($md, 'status\s*:\s*approved', 'status: used')
+    [System.IO.File]::WriteAllText($ApprovePath, $mdUsed, (New-Object System.Text.UTF8Encoding($false)))
+    $gateInfo.status = 'used'
+    $gateInfo.claimed = $true
+  } else {
+    $gateInfo.status = 'approved (dry-run, not consumed)'
   }
   $gateInfo.checked = $true
-  $gateInfo.status = 'approved'
   $gateInfo.token = $tm.Groups[1].Value
+} else {
+  Write-Host '[bb-run] WARNING: gate SKIPPED - this dispatch has no approval and no plan lock' -ForegroundColor Red
 }
 
 # ---------- guard settings must live in the isolated config dir ----------
@@ -184,24 +204,38 @@ $sw.Stop()
 [System.IO.File]::WriteAllText($logPath, ($stdout + "`n--- stderr ---`n" + $stderr), (New-Object System.Text.UTF8Encoding($false)))
 
 # ---------- verify ledger (wrapper computes hashes; the agent never has to) ----------
-$verified = @(); $done = 0; $failed = 0; $missing = 0
+$verified = @(); $done = 0; $failed = 0; $missing = 0; $hashMismatch = 0
+$ids = @()
 if (Test-Path -LiteralPath $ProgressPath) {
   foreach ($l in (Get-Content -LiteralPath $ProgressPath -Encoding UTF8 | Where-Object { $_ -match '^\d' })) {
     $f = $l -split '\|'
     if ($f.Count -lt 3) { continue }
     if ($f[1] -eq 'done') { $done++ }
     if ($f[1] -eq 'failed') { $failed++ }
+    if ($f[0] -match '^\d+$') { $ids += [int]$f[0] }
     $p = $f[2]
     if (-not $p) { continue }
     if (Test-Path -LiteralPath $p) {
       $fi = Get-Item -LiteralPath $p
-      $verified += [ordered]@{ id=$f[0]; status=$f[1]; path=$p; exists=$true; bytes=$fi.Length;
-        sha256=(Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash.ToLower() }
+      $real = (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash.ToLower()
+      $entry = [ordered]@{ id=$f[0]; status=$f[1]; path=$p; exists=$true; bytes=$fi.Length; sha256=$real }
+      # compare against the ledger's declared hash when the agent actually wrote one
+      if ($f.Count -ge 5 -and $f[4] -and $f[4] -notmatch '^0+$' -and $f[4] -ne '-') {
+        if ($real.Substring(0,8) -ne $f[4].ToLower()) { $hashMismatch++; $entry.declared_mismatch = $true }
+      }
+      $verified += $entry
     } else {
       $missing++
       $verified += [ordered]@{ id=$f[0]; status=$f[1]; path=$p; exists=$false; bytes=0; sha256='' }
     }
   }
+}
+
+# numbering continuity: 1..max(id) must all be present
+$gaps = 0
+if ($ids.Count -gt 0) {
+  $maxId = ($ids | Measure-Object -Maximum).Maximum
+  $gaps = @(1..$maxId | Where-Object { $ids -notcontains $_ }).Count
 }
 
 $tail = @()
@@ -213,23 +247,25 @@ $completion = [ordered]@{
   duration_sec = [math]::Round($sw.Elapsed.TotalSeconds, 1)
   effort = $Effort; model = $Model; max_turns = $MaxTurns
   gate = $gateInfo.status
-  ledger = [ordered]@{ done=$done; failed=$failed; missing_files=$missing }
+  ledger = [ordered]@{ done=$done; failed=$failed; missing_files=$missing; hash_mismatch=$hashMismatch; gaps=$gaps }
   verified = $verified
   log_path = $logPath
   log_tail = ($tail -join "`n")
 }
 WriteJson $completionPath $completion
 
-# consume the approval (flip status to used)
-if ($gateInfo.checked) {
-  $md2 = Get-Content -LiteralPath $ApprovePath -Raw -Encoding UTF8
-  $md2 = [regex]::Replace($md2, 'status\s*:\s*approved', 'status: used')
-  [System.IO.File]::WriteAllText($ApprovePath, $md2, (New-Object System.Text.UTF8Encoding($false)))
+# rollback the claim only if the wrapper itself failed to start the CLI
+# (a CLI error still counts as consumed - the run did happen)
+if ($gateInfo.claimed -and $status -eq 'ERROR') {
+  $mdBack = Get-Content -LiteralPath $ApprovePath -Raw -Encoding UTF8
+  $mdBack = [regex]::Replace($mdBack, 'status\s*:\s*used', 'status: approved')
+  [System.IO.File]::WriteAllText($ApprovePath, $mdBack, (New-Object System.Text.UTF8Encoding($false)))
+  Write-Host '[bb-run] approval rolled back to approved (CLI never started)' -ForegroundColor Yellow
 }
 
 foreach ($k in $backup.Keys) { [System.Environment]::SetEnvironmentVariable($k, $backup[$k]) }
 
 Write-Host ('[bb-run] ' + $status + ' exit=' + $exitCode + ' in ' + $completion.duration_sec + 's') -ForegroundColor Green
-Write-Host ('  ledger  : done=' + $done + ' failed=' + $failed + ' missing=' + $missing)
+Write-Host ('  ledger  : done=' + $done + ' failed=' + $failed + ' missing=' + $missing + ' hash_mismatch=' + $hashMismatch + ' gaps=' + $gaps)
 Write-Host ('  run dir : ' + $runDir)
 exit $exitCode

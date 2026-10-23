@@ -36,7 +36,7 @@ codebuddy
 
 1. **`--disallowedTools Bash PowerShell`** —— 注意是**两个独立参数**。写成 `"Bash,PowerShell"` 会被当成一个不存在的工具名，等于没禁（实测：agent 照样跑 shell 成功）
 2. **deny 双写** —— 只写 `Bash(echo:*)` 拦不住 PowerShell 工具（实测：Bash 被拒后 agent 改用 PowerShell 执行成功）
-3. **门控** —— `APPROVED.md` 的 `plan_sha256` 必须与 `PLAN.md` 实际值一致；改一个字节就拒；`status` 从 `approved` 变 `used` 后不能重放
+3. **门控** —— `dispatch_sha256` 同时绑定 `PLAN.md` 与 `PROMPT.md`（换任务书也拒）；`status` 在派发瞬间变 `used`，不能重放
 
 `allow` 白名单只服务**引擎A 的 Workflow 子代理**（固定 acceptEdits、走权限链）。调研类任务要 `WebSearch` + `WebFetch` 双开。
 
@@ -61,12 +61,16 @@ case4 shell guard   : shell-dir=False  no-shell-note=True
 
 1. 写 `PLAN.md`（验收项要可验证）
 2. 写 `PROMPT.md`（任务书，模板 `templates/PROMPT.md`；**永远不要把任务文本贴进命令行**）
-3. 人填 `APPROVED.md`：
+3. 人填 `APPROVED.md`（指纹同时覆盖 PLAN 与 PROMPT）：
    ```powershell
-   (Get-FileHash .\PLAN.md -Algorithm SHA256).Hash.Substring(0,12).ToLower()
+   $p = (Get-FileHash .\PLAN.md  -Algorithm SHA256).Hash.ToLower()
+   $q = (Get-FileHash .\PROMPT.md -Algorithm SHA256).Hash.ToLower()
+   $h = [Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::ASCII.GetBytes($p + ':' + $q))
+   (-join ($h | ForEach-Object { $_.ToString('x2') })).Substring(0,12)
+
    -join ((1..16) | ForEach-Object { '{0:x}' -f (Get-Random -Max 16) })
    ```
-   两个结果抄进模板，`status` 保持 `approved`
+   两个结果抄进模板（`dispatch_sha256` 与 `token`），`status` 保持 `approved`
 4. 派发：
    ```powershell
    powershell -ExecutionPolicy Bypass -File "<仓库>\scripts\bb-run.ps1" -WorkDir "<项目绝对路径>" -Effort max -MaxTurns 200 -TimeoutSec 7200

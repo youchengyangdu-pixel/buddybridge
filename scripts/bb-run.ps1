@@ -118,7 +118,10 @@ if (-not $SkipGate) {
   if ($hm.Groups[1].Value.ToLower() -ne $actual) {
     Fail ('dispatch hash mismatch: approved=' + $hm.Groups[1].Value.ToLower() + ' actual=' + $actual + ' (covers PLAN.md + PROMPT.md)') 17
   }
-  # claim-at-gate: flip to used NOW, so two concurrent runs cannot both pass.
+  # claim-at-gate: flip to used before the CLI runs, which shrinks the replay window
+  # from "the whole run" to "a few milliseconds". This is NOT a lock: two processes
+  # that read the file in the same instant can still both pass. One WorkDir = one run
+  # at a time is a documented operating rule, not an enforced invariant.
   # A dry run must NOT consume the approval.
   if (-not $DryRun) {
     $mdUsed = [regex]::Replace($md, '(?m)^(\s*[-*]?\s*status\s*:\s*)approved', '${1}used', $opt)

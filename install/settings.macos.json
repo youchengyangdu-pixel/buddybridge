@@ -1,32 +1,34 @@
 {
   "permissions": {
-    "defaultMode": "auto",
-    "allow": [
-      "WebSearch",
-      "WebFetch",
-      "Read",
-      "Edit",
-      "Bash(git:*)",
-      "Bash(npm:*)",
-      "Bash(node:*)",
-      "Bash(python:*)"
-    ],
+    "defaultMode": "bypassPermissions",
     "deny": [
       "Bash(rm -rf:*)",
       "Bash(sudo:*)",
-      "Bash(eval:*)",
+      "Bash(mkfs:*)",
+      "Bash(dd:*)",
+      "Bash(shutdown:*)",
       "Bash(curl:*)",
       "Bash(wget:*)",
       "Bash(git push:*)",
       "Bash(git reset --hard:*)",
       "Bash(git clean:*)",
-      "Edit(.git/**)",
-      "Edit(.codebuddy/**)",
-      "Edit(.mcp.json)",
-      "Edit(.env*)",
-      "Read(.env*)",
-      "Read(~/.ssh/**)",
-      "Read(~/.aws/**)"
+      "Bash(eval:*)",
+      "Bash(node -e:*)",
+      "Bash(python -c:*)",
+
+      "Edit(**/.git/**)",
+      "Edit(**/.codebuddy/**)",
+      "Edit(**/.workbuddy/**)",
+      "Edit(**/.buddybridge/**)",
+      "Edit(**/.mcp.json)",
+      "Edit(**/.env*)",
+      "Edit(**/APPROVED.md)",
+      "Read(**/.env*)",
+      "Read(**/.ssh/**)",
+      "Read(**/.aws/**)",
+      "Read(**/.codebuddy/**)",
+      "Read(**/.workbuddy/**)",
+      "Read(**/.buddybridge/**)"
     ]
   },
   "sandbox": {

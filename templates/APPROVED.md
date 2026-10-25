@@ -16,6 +16,7 @@
 
 ## 怎么填
 
+**Windows（PowerShell）**：
 ```powershell
 $p = (Get-FileHash .\PLAN.md  -Algorithm SHA256).Hash.ToLower()
 $q = (Get-FileHash .\PROMPT.md -Algorithm SHA256).Hash.ToLower()
@@ -23,10 +24,20 @@ $h = [Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::ASCII
 (-join ($h | ForEach-Object { $_.ToString('x2') })).Substring(0,12)
 ```
 
+**macOS / Linux（bash）**：
+```bash
+p=$(shasum -a 256 PLAN.md  | awk '{print $1}')
+q=$(shasum -a 256 PROMPT.md | awk '{print $1}')
+printf '%s:%s' "$p" "$q" | shasum -a 256 | awk '{print $1}' | cut -c1-12
+```
+
 把输出抄进 `dispatch_sha256`，再生成一个 token：
 
 ```powershell
 -join ((1..16) | ForEach-Object { '{0:x}' -f (Get-Random -Max 16) })
+```
+```bash
+openssl rand -hex 8
 ```
 
 `status` 保持 `approved`。`expires` 可选；写了就按时间失效，不写就只靠 `used` 防重放。
